@@ -2,7 +2,7 @@
 
 **End-to-end analysis of 25 years of government mandi (wholesale market) prices for onion, tomato and potato across 4 major Indian markets.**
 
-`Excel` · `Power Query` · `MySQL` · `Python` *(in progress)* · `Power BI` *(in progress)*
+`Excel` · `Power Query` · `MySQL` · `Python (pandas, seaborn)` · `Power BI` *(in progress)*
 
 ![Excel Dashboard](screenshot/excel_dashboard.png)
 
@@ -137,6 +137,47 @@ commodities (3) ── prices (2,88,409)  ← fact table
 
 ---
 
+## 🐍 Stage 3: Python *(in progress)*
+
+A single script, `python/analysis.py`, rebuilds the whole cleaning pipeline from the **raw** files, so the analysis is fully reproducible with one run.
+
+### 1. Load & combine
+- `pathlib` + `glob` find all 13 CSVs in `raw_data/`; `pd.concat` stacks them → **2,88,473 rows**
+
+### 2. Clean (same rules as Excel)
+
+| Step | pandas | Excel equivalent |
+|---|---|---|
+| Drop unused column | `drop(columns=...)` | Remove Columns |
+| Trim text | `.str.strip()` | Trim |
+| Standardise city | `.replace("Bangalore", "Bengaluru")` | Replace Values |
+| Parse dates | `pd.to_datetime(format="%d/%m/%Y")` | Change Type using Locale |
+| Remove duplicates | `drop_duplicates()` | Remove Duplicates |
+| Quality flag | custom function + `apply` | Custom Column (if/else) |
+
+### 3. Feature engineering
+`Year`, `Month`, `Month_Name`, `Price_per_kg`, `Price_Spread`, plus `Season` and `Market_Type` via `.map()` lookups (Python's equivalent of XLOOKUP). Clean data saved to `python/mandi_prices_clean_python.csv`.
+
+### 4. Validation across 3 tools
+
+| Check | Excel | SQL | Python |
+|---|---|---|---|
+| Raw rows | 2,88,473 | – | 2,88,473 |
+| Logic errors / Outliers / Too low | 9 / 12 / 43 | – | 9 / 12 / 43 |
+| **Clean rows** | **2,88,409** | **2,88,409** | **2,88,409** |
+
+All three tools produced identical results, confirming the cleaning logic is correct and reproducible.
+
+### 5. Charts
+
+![Seasonality chart](python/charts/01_seasonality.png)
+
+*More charts and statistical analysis (volatility, Nashik → Delhi price lag) coming next.*
+
+**Python skills used:** pandas (concat, groupby, apply, map, datetime) · pathlib · seaborn / matplotlib · reproducible scripts
+
+---
+
 ## 💡 Key Insights (so far)
 
 **1. Strong seasonal pattern (2022–2026)**
@@ -194,6 +235,7 @@ india-vegetable-price-analysis/
 ├── raw_data/          # 13 original CSV files from data.gov.in API (never edited)
 ├── excel/             # mandi_analysis.xlsx: Power Query, pivots, dashboard, Price Finder
 ├── sql/               # mandi_prices_clean.csv + 02_my_queries.sql (schema, load, analysis)
+├── python/            # analysis.py (cleaning pipeline + EDA), clean CSV, charts/
 ├── screenshot/        # Dashboard screenshots
 └── README.md
 ```
@@ -204,7 +246,8 @@ india-vegetable-price-analysis/
 
 - [x] **Stage 1:** Data collection (API), Excel cleaning, analysis, dashboard, lookups
 - [x] **Stage 2:** SQL: star schema, business queries, CTEs, window functions
-- [ ] **Stage 3:** Python: Pandas cleaning pipeline, EDA
+- [x] **Stage 3a:** Python: pandas cleaning pipeline, feature engineering, seasonality chart
+- [ ] **Stage 3b:** Python: more EDA charts
 - [ ] **Stage 4:** Statistics: volatility, correlation, Nashik → Delhi price lag
 - [ ] **Stage 5:** Power BI: executive dashboard
 
