@@ -1,4 +1,4 @@
-# India Vegetable Price Analysis
+# Price Analysis
 
 **End-to-end analysis of 25 years of government mandi (wholesale market) prices for onion, tomato and potato across 4 major Indian markets.**
 
