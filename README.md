@@ -2,7 +2,7 @@
 
 **End-to-end analysis of 25 years of government mandi (wholesale market) prices for onion, tomato and potato across 4 major Indian markets.**
 
-`Excel` · `Power Query` · `SQL` *(in progress)* · `Python` *(in progress)* · `Power BI` *(in progress)*
+`Excel` · `Power Query` · `MySQL` · `Python` *(in progress)* · `Power BI` *(in progress)*
 
 ![Excel Dashboard](screenshot/excel_dashboard.png)
 
@@ -91,6 +91,52 @@ Pick a vegetable, city and year from dropdowns (Data Validation) to get the aver
 
 ---
 
+## 🗄️ Stage 2: SQL (MySQL)
+
+### 1. Loading the data
+- Created database `mandi_db` and a **staging table** matching the clean CSV
+- Bulk-loaded **2,88,409 rows** with `LOAD DATA LOCAL INFILE` (0 skipped, 0 warnings)
+- Verified row counts after every load step. A query that timed out in the client had actually completed on the server, creating duplicates, which were caught by the count check and fixed with `TRUNCATE` + reload
+
+### 2. Star schema design
+Split the flat table into **dimension** and **fact** tables to remove repeated text and enable joins:
+
+```
+          districts (4)
+               │
+           markets (~130)
+               │
+commodities (3) ── prices (2,88,409)  ← fact table
+```
+
+| Table | Type | Key columns |
+|---|---|---|
+| `districts` | Dimension | district_id (PK), district_name, state, region, city_type |
+| `commodities` | Dimension | commodity_id (PK), commodity_name |
+| `markets` | Dimension | market_id (PK), market_name, district_id (FK) |
+| `prices` | Fact | price_id (PK), arrival_date, market_id (FK), commodity_id (FK), min/max/modal price |
+
+- `PRIMARY KEY`, `FOREIGN KEY`, `UNIQUE`, `NOT NULL` constraints
+- `DECIMAL(12,2)` for prices (exact, unlike FLOAT)
+- Dimension and fact tables populated with `INSERT … SELECT` + `JOIN`s from staging
+
+### 3. Analysis queries
+
+| # | Business question | SQL concepts |
+|---|---|---|
+| Q1 | Average price per kg by vegetable | JOIN, GROUP BY, AVG, ROUND |
+| Q2 | Average price by city & vegetable (2022–2025) | Multi-table JOINs, WHERE on YEAR() |
+| Q3 | Markets with more than 5,000 records | GROUP BY + HAVING |
+| Q4 | Rank cities by price within each vegetable | CTE, `RANK() OVER (PARTITION BY …)` |
+| Q5 | Month-on-month tomato price change (2023) | CTE, `LAG()` window function |
+| Q6 | Peak month for each vegetable | Two chained CTEs + RANK, filter on rank |
+
+**Validation:** SQL results matched the Excel pivot tables exactly (e.g. Onion ₹14.2, Tomato ₹13.5, Potato ₹11.5 per kg overall), cross-validating both tools.
+
+**SQL skills used:** CREATE/ALTER/TRUNCATE · LOAD DATA · Staging tables · Star schema · Primary & foreign keys · INSERT…SELECT · JOINs · GROUP BY / HAVING · CTEs · Window functions (RANK, LAG, PARTITION BY) · Data validation via row counts
+
+---
+
 ## 💡 Key Insights (so far)
 
 **1. Strong seasonal pattern (2022–2026)**
@@ -116,7 +162,20 @@ Pick a vegetable, city and year from dropdowns (Data Validation) to get the aver
 - Average daily min–max spread for onion is ₹1,297/quintal (₹1,547 in Nashik).
 - In Nashik, the tomato spread is larger than the price itself, so one farmer can earn more than double another on the same day (due to quality differences and distress selling).
 
-**6. Highest price recorded:** ₹150/kg, **tomato, July 2023**, Pune (Manchar).
+**6. The 2023 tomato crisis had a one-month early warning (SQL `LAG` analysis)**
+
+| Month (2023) | Avg ₹/kg | Change vs previous month |
+|---|---|---|
+| May | 8.0 | −0.8 |
+| June | 23.8 | **+15.8** ⚠️ early warning |
+| July | **70.4** | **+46.6** 🔺 peak |
+| August | 45.1 | −25.3 |
+| September | 8.8 | **−36.3** 🔻 crash |
+
+- Prices **tripled in June**, a month **before** the July peak (almost 9× the May price).
+- **Recommendation:** an alert when month-on-month change exceeds +₹10/kg would have flagged the crisis early enough to release stock or arrange supply.
+
+**7. Highest price recorded:** ₹150/kg, **tomato, July 2023**, Pune (Manchar).
 
 ---
 
@@ -124,7 +183,7 @@ Pick a vegetable, city and year from dropdowns (Data Validation) to get the aver
 - These are **wholesale mandi prices**, not retail prices paid by consumers.
 - Bengaluru data is incomplete from 2025 and ends in May 2026.
 - Number of markets differs by city (e.g. Nashik ~70 market names, Delhi ~10), so city averages represent different market mixes.
-- Some market names may be spelling variants of the same mandi.
+- Some market names are spelling variants of the same mandi (e.g. `Nasik` vs `Nashik`, `Lasalgaon` vs `APMC Lasalgaon`). Next step: a mapping table to standardise them.
 
 ---
 
@@ -134,6 +193,7 @@ Pick a vegetable, city and year from dropdowns (Data Validation) to get the aver
 india-vegetable-price-analysis/
 ├── raw_data/          # 13 original CSV files from data.gov.in API (never edited)
 ├── excel/             # mandi_analysis.xlsx: Power Query, pivots, dashboard, Price Finder
+├── sql/               # mandi_prices_clean.csv + 02_my_queries.sql (schema, load, analysis)
 ├── screenshot/        # Dashboard screenshots
 └── README.md
 ```
@@ -143,7 +203,7 @@ india-vegetable-price-analysis/
 ## 🚧 Roadmap
 
 - [x] **Stage 1:** Data collection (API), Excel cleaning, analysis, dashboard, lookups
-- [ ] **Stage 2:** SQL: database design, business queries, window functions
+- [x] **Stage 2:** SQL: star schema, business queries, CTEs, window functions
 - [ ] **Stage 3:** Python: Pandas cleaning pipeline, EDA
 - [ ] **Stage 4:** Statistics: volatility, correlation, Nashik → Delhi price lag
 - [ ] **Stage 5:** Power BI: executive dashboard
