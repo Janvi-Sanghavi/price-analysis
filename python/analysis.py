@@ -107,3 +107,52 @@ plt.tight_layout()
 plt.savefig(CHARTS / "01_seasonality.png", dpi = 150)
 plt.close()
 print("Saved chart 1")
+
+# Chart 2: Yearly Trend
+yearly = df.groupby(["Year", "Commodity"])["Price_per_kg"].mean().reset_index()
+sns.lineplot(data = yearly, x = "Year", y = "Price_per_kg", hue = "Commodity")
+plt.title("Yearly avergae price, 2001 - 2026")
+plt.ylabel("₹ per kg")
+plt.tight_layout()
+plt.savefig(CHARTS / "02_yearly_trend.png", dpi = 150)
+plt.close()
+print("Saved chart 2")
+
+# Chart 3: City comparison (2022 - 2025, complete data for all cities)
+city_df = df[(df["Year"] >= 2022) & (df["Year"] <= 2025)]
+city = city_df.groupby(["District", "Commodity"])["Price_per_kg"].mean().reset_index()
+plt.figure(figsize = (10, 5))
+sns.barplot(data = city, x = "District", y = "Price_per_kg", hue = "Commodity")
+plt.title("Average price by city, 2022 - 2025")
+plt.ylabel("₹ per kg")
+plt.xlabel("")
+plt.tight_layout()
+plt.savefig(CHARTS / "03_city_comparison.png", dpi = 150)
+plt.close()
+print("Saved chart 3")
+
+# Chart 4: 2023 tomato crisis, month by month
+tomato23 = df[(df["Commodity"] == "Tomato") & (df["Year"] == 2023)]
+monthly = tomato23.groupby("Month")["Price_per_kg"].mean()
+plt.figure(figsize = (10, 5))
+plt.bar(monthly.index, monthly.values, color = "#C0392B")
+plt.title("2023 tomato crisis: Average price by month")
+plt.ylabel("₹ per kg")
+plt.xticks(range(1, 13), ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"])
+plt.tight_layout()
+plt.savefig(CHARTS / "04_tomato_crisis_2023.png", dpi = 150)
+plt.close()
+print("Saved chart 4")
+
+# ------------ 6. Statistics -------------------
+print("\n==== A. Mean, Median, Voltality (2022 - 2026) ====")
+stats = recent.groupby("Commodity")["Price_per_kg"].agg(["mean", "median", "std"]).round(1)
+stats["CV_%"] = (stats["std"] / stats["mean"] * 100).round(0)
+print(stats.sort_values("CV_%", ascending = False))
+
+print("\n=== B. Does Nashik onion price lead Delhi? ====")
+onion = recent[recent["Commodity"] == "Onion"]
+weekly = (onion.groupby(["District", pd.Grouper(key = "Arrival_Date", freq = "W")])["Price_per_kg"].mean().unstack("District"))
+for lag in range(0, 5):
+    corr = weekly["Nashik"].shift(lag).corr(weekly["Delhi"])
+    print(f"Nashik {lag} week(s) earlier vs Delhi: correlation = {corr: .3f}")
