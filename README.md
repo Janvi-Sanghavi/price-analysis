@@ -137,7 +137,7 @@ commodities (3) ── prices (2,88,409)  ← fact table
 
 ---
 
-## 🐍 Stage 3: Python *(in progress)*
+## 🐍 Stage 3: Python
 
 A single script, `python/analysis.py`, rebuilds the whole cleaning pipeline from the **raw** files, so the analysis is fully reproducible with one run.
 
@@ -170,11 +170,50 @@ All three tools produced identical results, confirming the cleaning logic is cor
 
 ### 5. Charts
 
+| Chart | What it shows |
+|---|---|
+| `01_seasonality.png` | Average price by month (2022–2026): tomato peaks in July, onion and potato in November |
+| `02_yearly_trend.png` | 25-year price trend (2001–2026) for all three vegetables |
+| `03_city_comparison.png` | Average price by city (2022–2025): Bengaluru highest for all three |
+| `04_tomato_crisis_2023.png` | Month-by-month view of the 2023 tomato crisis (₹8 → ₹70 → ₹9/kg) |
+
 ![Seasonality chart](python/charts/01_seasonality.png)
+![Yearly trend](python/charts/02_yearly_trend.png)
+![City comparison](python/charts/03_city_comparison.png)
+![2023 tomato crisis](python/charts/04_tomato_crisis_2023.png)
 
-*More charts and statistical analysis (volatility, Nashik → Delhi price lag) coming next.*
+**Python skills used:** pandas (concat, groupby, apply, map, datetime, Grouper, unstack, shift) · pathlib · seaborn / matplotlib · reproducible scripts
 
-**Python skills used:** pandas (concat, groupby, apply, map, datetime) · pathlib · seaborn / matplotlib · reproducible scripts
+---
+
+## 📊 Stage 4: Statistics (Python)
+
+### 1. Central tendency & volatility (2022–2026)
+
+| Vegetable | Mean (₹/kg) | Median (₹/kg) | Std dev | Coefficient of variation |
+|---|---|---|---|---|
+| Tomato | 18.6 | 15.0 | 13.9 | **75%** (most volatile) |
+| Onion | 18.1 | 14.7 | 10.4 | 57% |
+| Potato | 15.0 | 14.0 | 5.6 | **37%** (most stable) |
+
+- **Coefficient of variation (std ÷ mean)** was used to compare volatility across vegetables with different price levels.
+- **Mean > median for all three:** the distribution is **right-skewed**. Most days have normal prices, while a few crisis spikes pull the mean up. The **median is the better measure of a typical price**.
+- **Volatility follows shelf life:** tomato (perishable) is the most volatile, potato (cold storage) the most stable, and onion (storable for a few months) sits in between.
+
+### 2. Does the producer market lead the consumer market? (lag correlation)
+**Hypothesis:** onion prices in Nashik (the main producing region) rise before prices in Delhi (the main consuming city), so Nashik could act as an early-warning signal.
+
+**Method:** weekly average onion prices per city (`pd.Grouper`), then the correlation between Delhi and Nashik shifted by 0–4 weeks (`.shift()` + `.corr()`).
+
+| Nashik lagged by | Correlation with Delhi |
+|---|---|
+| 0 weeks | **0.965** |
+| 1 week | 0.960 |
+| 2 weeks | 0.928 |
+| 3 weeks | 0.888 |
+| 4 weeks | 0.842 |
+
+**Result: hypothesis rejected.** The correlation is highest with **no lag** and falls as the lag grows, so **Nashik and Delhi move together within the same week**. Price information travels quickly across Indian mandis, so producer-market prices do **not** give consumer cities weeks of warning. The better early-warning signal is the **month-on-month price jump** (see Insight 6).
 
 ---
 
@@ -216,7 +255,14 @@ All three tools produced identical results, confirming the cleaning logic is cor
 - Prices **tripled in June**, a month **before** the July peak (almost 9× the May price).
 - **Recommendation:** an alert when month-on-month change exceeds +₹10/kg would have flagged the crisis early enough to release stock or arrange supply.
 
-**7. Highest price recorded:** ₹150/kg, **tomato, July 2023**, Pune (Manchar).
+**7. Tomato is twice as volatile as potato**
+- Coefficient of variation: tomato **75%**, onion 57%, potato **37%**. Price stability follows how long each vegetable can be stored.
+- **Recommendation:** buffer stocks work well for onion (storable); for tomato, cold chains and faster transport matter more.
+
+**8. Producer and consumer markets move together**
+- Nashik and Delhi onion prices are 0.97 correlated **in the same week**, with no lead time. Monitoring Nashik alone does not give Delhi advance warning.
+
+**9. Highest price recorded:** ₹150/kg, **tomato, July 2023**, Pune (Manchar).
 
 ---
 
@@ -247,8 +293,8 @@ india-vegetable-price-analysis/
 - [x] **Stage 1:** Data collection (API), Excel cleaning, analysis, dashboard, lookups
 - [x] **Stage 2:** SQL: star schema, business queries, CTEs, window functions
 - [x] **Stage 3a:** Python: pandas cleaning pipeline, feature engineering, seasonality chart
-- [ ] **Stage 3b:** Python: more EDA charts
-- [ ] **Stage 4:** Statistics: volatility, correlation, Nashik → Delhi price lag
+- [x] **Stage 3b:** Python: EDA charts (yearly trend, city comparison, 2023 crisis)
+- [x] **Stage 4:** Statistics: mean vs median, volatility (CV), Nashik → Delhi lag correlation
 - [ ] **Stage 5:** Power BI: executive dashboard
 
 ---
