@@ -2,9 +2,23 @@
 
 **End-to-end analysis of 25 years of government mandi (wholesale market) prices for onion, tomato and potato across 4 major Indian markets.**
 
-`Excel` · `Power Query` · `MySQL` · `Python (pandas, seaborn)` · `Power BI` *(in progress)*
+`Excel` · `Power Query` · `MySQL` · `Python (pandas, seaborn)` · `Power BI (DAX)`
 
-![Excel Dashboard](screenshot/excel_dashboard.png)
+![Power BI Overview](screenshot/powerbi_overview.png)
+
+---
+
+## ⚡ Executive Summary
+
+Analysed **2,88,409 government mandi price records (2001–2026)** for onion, tomato and potato across Nashik, Pune, Delhi and Bengaluru, using Excel, SQL, Python and Power BI, with results cross-validated across all four tools.
+
+1. **Prices are strongly seasonal.** Tomato peaks in **July** (₹32.6/kg) and onion in **November** (₹29.2/kg), about **3× their cheapest month**.
+2. **Shelf life drives volatility.** Tomato (perishable) is the most volatile (CV **75%**); potato (cold storage) is the most stable (**37%**).
+3. **Bengaluru pays the most** for all three vegetables. Its potato costs **60% more** than Delhi's.
+4. **The 2023 tomato crisis had a one-month warning.** Prices tripled in June before peaking at **₹70/kg** in July.
+5. **Producer and consumer markets move together.** Nashik and Delhi onion prices are 0.97 correlated in the same week, with no lead time.
+
+**Recommendation:** monitor **month-on-month price jumps** (not producer-market prices) as the early-warning signal; release **onion** buffer stock from September, and strengthen **tomato** cold chains before June.
 
 ---
 
@@ -83,6 +97,8 @@ Pivot tables for yearly trend, monthly seasonality, city comparison, price sprea
 
 ### 6. Dashboard
 Interactive Excel dashboard with KPI cards, 3 pivot charts and slicers (Commodity, District).
+
+![Excel Dashboard](screenshot/excel_dashboard.png)
 
 ### 7. Price Finder tool
 Pick a vegetable, city and year from dropdowns (Data Validation) to get the average price, highest price, record count and **peak month**, using `AVERAGEIFS`, `MAXIFS`, `COUNTIFS` and `XLOOKUP`.
@@ -217,7 +233,57 @@ All three tools produced identical results, confirming the cleaning logic is cor
 
 ---
 
-## 💡 Key Insights (so far)
+## 📈 Stage 5: Power BI Dashboard
+
+An interactive 4-page report (`powerbi/mandi_dashboard.pbix`) with a custom earthy theme (`powerbi/mandi_theme_earth.json`).
+
+### Data model
+Star schema (the same design as the SQL database):
+```
+   Date (calendar) ──┐
+                     ├── prices (fact, 2,88,409 rows)
+   Districts ────────┘
+```
+- **Date table** built with DAX (`CALENDAR` + `ADDCOLUMNS`), marked as a date table, with Month Name sorted by month number
+- **Districts** dimension (Region, City type), one-to-many relationships, single cross-filter direction
+
+### DAX measures
+
+| Measure | DAX |
+|---|---|
+| Avg Price | `AVERAGE(prices[Price_per_kg])` |
+| Median Price | `MEDIAN(prices[Price_per_kg])` |
+| Max Price | `MAX(prices[Price_per_kg])` |
+| Records | `COUNTROWS(prices)` |
+| Volatility % | `DIVIDE(STDEV.P(prices[Price_per_kg]), [Avg Price])` |
+| Avg Price Last Month | `CALCULATE([Avg Price], DATEADD('Date'[Date], -1, MONTH))` |
+| MoM % | `DIVIDE([Avg Price] - [Avg Price Last Month], [Avg Price Last Month])` |
+| Avg Price Last Year | `CALCULATE([Avg Price], SAMEPERIODLASTYEAR('Date'[Date]))` |
+| YoY % | `DIVIDE([Avg Price] - [Avg Price Last Year], [Avg Price Last Year])` |
+
+**Validation:** Power BI averages (Onion 14.24, Tomato 13.51, Potato 11.49 ₹/kg) matched Excel, SQL and Python exactly.
+
+### Report pages
+
+| Page | Contents |
+|---|---|
+| **Overview** | KPI cards (average, median, max, records, volatility), 25-year trend, city comparison, volatility by vegetable |
+| **Seasonality** | Monthly price line chart, month × vegetable heatmap (conditional formatting), season comparison, key insights |
+| **Cities** | City comparison, city × vegetable heatmap, map of India, key insights (2022–2025 complete data) |
+| **2023 Crisis** | Monthly tomato prices 2023, month-on-month % change (red rise / green fall), KPI cards, what happened |
+
+**Features:** synced dropdown slicers across pages (Commodity, District), page-specific year ranges, page-level filters, conditional formatting, custom JSON theme.
+
+| | |
+|---|---|
+| ![Overview](screenshot/powerbi_overview.png) | ![Seasonality](screenshot/powerbi_seasonality.png) |
+| ![Cities](screenshot/powerbi_cities.png) | ![2023 Crisis](screenshot/powerbi_crisis.png) |
+
+**Power BI skills used:** Power Query · Star schema data modelling · Relationships · DAX (CALCULATE, time intelligence, DIVIDE, STDEV.P) · Date table · Conditional formatting · Synced slicers · Page filters · Maps · Custom themes · Dashboard design
+
+---
+
+## 💡 Key Insights
 
 **1. Strong seasonal pattern (2022–2026)**
 
@@ -282,20 +348,10 @@ india-vegetable-price-analysis/
 ├── excel/             # mandi_analysis.xlsx: Power Query, pivots, dashboard, Price Finder
 ├── sql/               # mandi_prices_clean.csv + 02_my_queries.sql (schema, load, analysis)
 ├── python/            # analysis.py (cleaning pipeline + EDA), clean CSV, charts/
-├── screenshot/        # Dashboard screenshots
+├── powerbi/           # mandi_dashboard.pbix + custom theme (mandi_theme_earth.json)
+├── screenshot/        # Excel and Power BI dashboard screenshots
 └── README.md
 ```
-
----
-
-## 🚧 Roadmap
-
-- [x] **Stage 1:** Data collection (API), Excel cleaning, analysis, dashboard, lookups
-- [x] **Stage 2:** SQL: star schema, business queries, CTEs, window functions
-- [x] **Stage 3a:** Python: pandas cleaning pipeline, feature engineering, seasonality chart
-- [x] **Stage 3b:** Python: EDA charts (yearly trend, city comparison, 2023 crisis)
-- [x] **Stage 4:** Statistics: mean vs median, volatility (CV), Nashik → Delhi lag correlation
-- [ ] **Stage 5:** Power BI: executive dashboard
 
 ---
 
